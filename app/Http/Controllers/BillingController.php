@@ -16,6 +16,12 @@ class BillingController extends Controller
     {
         $plan = $request->validate(['plan' => ['required', 'in:basic,pro']])['plan'];
 
+        // A second Checkout would bill both plans; plan changes go through the billing portal.
+        $current = $request->user()->subscription('default');
+        if ($current && ! $current->ended()) {
+            return redirect('/pricing')->withErrors(['plan' => 'You already have a plan: change it from the billing portal.']);
+        }
+
         return $request->user()
             ->newSubscription('default', config("billing.prices.{$plan}"))
             ->checkout([

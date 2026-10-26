@@ -39,7 +39,7 @@ results=$(php -r '
   }' junit-as-delivered.xml)
 
 status=0
-for t in test_1_ test_1b_ test_1c_ test_2_ test_2b_ test_3_ test_4_ test_4b_; do
+for t in test_1_ test_1b_ test_1c_ test_2_ test_2b_ test_2c_ test_3_ test_4_ test_4b_; do
   line=$(grep "^${t}" <<<"$results" || true)
   case "$line" in
     *" failed") echo "as delivered, attack works: ${line% failed}" ;;

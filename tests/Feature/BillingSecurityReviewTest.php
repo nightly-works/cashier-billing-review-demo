@@ -26,23 +26,25 @@ class BillingSecurityReviewTest extends TestCase
         config(['cashier.webhook.secret' => null]);
         $bob = $this->customer('cus_bob');
 
-        $this->postWebhook($this->subscriptionCreatedEvent('cus_bob', 'price_pro_monthly'));
+        $response = $this->postWebhook($this->subscriptionCreatedEvent('cus_bob', 'price_pro_monthly'));
 
         $this->assertDatabaseMissing('subscriptions', ['user_id' => $bob->id]);
+        $response->assertStatus(500);
         $this->actingAs($bob)->get('/reports/forecast')->assertRedirect('/pricing');
     }
 
-    // The same with STRIPE_WEBHOOK_SECRET= present but empty: an HMAC with an empty key is
-    // still an HMAC anyone can compute.
+    // The same with STRIPE_WEBHOOK_SECRET= present but empty: Cashier skips the check too, and
+    // a fix that only forced the check on would accept this signature made with an empty key.
     public function test_1b_a_webhook_signed_with_an_empty_secret_is_refused(): void
     {
         config(['cashier.webhook.secret' => '']);
         $bob = $this->customer('cus_bob');
         $payload = $this->subscriptionCreatedEvent('cus_bob', 'price_pro_monthly');
 
-        $this->postWebhook($payload, ['Stripe-Signature' => $this->stripeSignature($payload, '')]);
+        $response = $this->postWebhook($payload, ['Stripe-Signature' => $this->stripeSignature($payload, '')]);
 
         $this->assertDatabaseMissing('subscriptions', ['user_id' => $bob->id]);
+        $response->assertStatus(500);
     }
 
     // The forged event needs the victim's Stripe customer id; /me handed it out.
@@ -63,9 +65,23 @@ class BillingSecurityReviewTest extends TestCase
         $bob = $this->customer();
 
         $response = $this->actingAs($bob)->post('/billing/checkout', ['price' => 'price_legacy_1eur_yearly']);
-
         $this->assertNotContains('price_legacy_1eur_yearly', $this->stripe->checkoutPrices());
         $response->assertSessionHasErrors('plan');
+
+        // Next to a valid plan, the smuggled price is ignored.
+        $this->actingAs($bob)->post('/billing/checkout', ['plan' => 'pro', 'price' => 'price_legacy_1eur_yearly']);
+        $this->assertSame(['price_pro_monthly'], $this->stripe->checkoutPrices());
+    }
+
+    // Found in the review pass: a second Checkout billed both plans.
+    public function test_2c_a_subscriber_cannot_start_a_second_subscription(): void
+    {
+        $bob = $this->customer();
+        $this->subscribe($bob, 'price_pro_monthly');
+
+        $this->actingAs($bob)->post('/billing/checkout', ['plan' => 'basic'])->assertSessionHasErrors('plan');
+
+        $this->assertSame([], $this->stripe->checkoutPrices());
     }
 
     public function test_2b_a_basic_subscription_does_not_open_pro_features(): void

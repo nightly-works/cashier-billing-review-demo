@@ -39,7 +39,7 @@ trait BillingHelpers
         ]);
     }
 
-    /** A customer.subscription.created event, as Stripe sends it. */
+    /** A customer.subscription.created event, trimmed to the fields Cashier reads. */
     protected function subscriptionCreatedEvent(string $customer, string $price): string
     {
         return json_encode([

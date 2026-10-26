@@ -4,19 +4,19 @@
 
 **Scope**: subscription checkout, the Stripe webhook, the checks in front of paid features, and what the app sends to the browser. Reviewed in this repository; the app has no live deployment and no Stripe account was touched.
 **Method**: source read, including Cashier's own code where the app relies on it; each suspected flaw written as an attack test (`tests/Feature/BillingSecurityReviewTest.php`) and run against the code as delivered (`scripts/prove-flaws.sh`: every attack works), then fixed one commit at a time until the same tests pass. Stripe's API is replaced by a fake that records what the app sends (`tests/Support/FakeStripe.php`); webhook signatures are computed the way Stripe computes them.
-**Result**: 4 findings: 1 critical, 2 high, 1 medium. All fixed, each with a test that fails if the flaw comes back.
+**Result**: 4 findings: 1 critical, 2 high, 1 medium, plus a double-billing bug found on the way. All fixed, each with a test that fails if the flaw comes back.
 
 ## Summary for the owner
 
-Today a customer can get Pro without paying in four ways: by sending your server a fake "subscription created" message, by buying the cheapest price in your Stripe account instead of Pro, by opening the export address directly, or by starting a payment that fails. First set `STRIPE_WEBHOOK_SECRET` on the server (Stripe Dashboard › Developers › Webhooks › your endpoint › Signing secret), then deploy the fixes, then check the subscriptions table for Pro subscriptions that have no matching subscription in Stripe. Paying customers see no change.
+Today a customer can get Pro without paying in four ways: by sending your server a fake "subscription created" message, by buying the cheapest price in your Stripe account instead of Pro, by opening the export address directly, or by starting a payment that fails. First set `STRIPE_WEBHOOK_SECRET` on the server (Stripe Dashboard › Developers › Webhooks › your endpoint › Signing secret), then deploy the fixes, then check the subscriptions table for Pro subscriptions that have no matching subscription in Stripe. Pro customers see no change; Basic customers lose the Pro features they were wrongly getting, and customers whose card failed lose them until they update it.
 
 ## Findings
 
 ### 1. Fake Stripe messages give Pro for free (critical)
 
-**What**: Cashier checks the signature of webhook calls only when `cashier.webhook.secret` is set (`WebhookController::__construct`). `STRIPE_WEBHOOK_SECRET` is not in `.env.example`, so the server runs without it, and Cashier creates or updates subscriptions from whatever JSON arrives at `/stripe/webhook`. An empty `STRIPE_WEBHOOK_SECRET=` is no better: the signature check then uses an empty key that anyone can sign with. The event needs the customer's Stripe id, and `/me` sends the whole user record to the browser, `stripe_id` included.
-**Impact**: a signed-in customer reads their own `cus_…` id from `/me`, posts a `customer.subscription.created` event for it with the Pro price, and has Pro. The same request can cancel or change other customers' subscriptions if their ids leak elsewhere.
-**Fix**: the webhook route is registered by the app, with Cashier's signature middleware always on and a guard that refuses every event (status 500, so Stripe retries later) until a real secret is configured. `/me` returns id, name and email only, and the billing columns are hidden from JSON.
+**What**: Cashier checks the signature of webhook calls only when `cashier.webhook.secret` is set (`WebhookController::__construct`). `STRIPE_WEBHOOK_SECRET` is not in `.env.example`, so the server runs without it, and Cashier creates or updates subscriptions from whatever JSON arrives at `/stripe/webhook`. An empty `STRIPE_WEBHOOK_SECRET=` is no better: Cashier skips the check the same way, and a fix that simply forced the check on would accept anything signed with an empty key. The event needs the customer's Stripe id, and `/me` sends the whole user record to the browser, `stripe_id` included.
+**Impact**: a signed-in customer reads their own `cus_…` id from `/me`, posts a `customer.subscription.created` event for it with the Pro price, and has Pro. Forged `customer.subscription.updated` or `customer.deleted` events can also change or cancel other customers' subscriptions if their ids leak elsewhere.
+**Fix**: the webhook route is registered by the app, with Cashier's signature middleware always on and a guard that refuses every event with a 500 until a real secret is configured; Stripe retries failed deliveries (for up to 3 days in live mode), so events are kept if the secret is set within that window. The route sits outside the `web` group, as Cashier's own does, so webhooks write no session. `/me` returns id, name and email only, and the billing columns are hidden from JSON.
 **Verified**: forged events are refused without a secret and with an empty one (tests 1, 1b); `/me` no longer contains the customer id (test 1c). A correctly signed event still creates the subscription, and events signed with another secret or unsigned get 403 (normal use).
 
 ### 2. Any price in the Stripe account opens Pro (high)
@@ -24,7 +24,9 @@ Today a customer can get Pro without paying in four ways: by sending your server
 **What**: the pricing page posts a Stripe price id from a hidden field, and `checkout()` passes it to Stripe as is. Pro routes check `subscribed('default')`, which is true for any active subscription, at any price.
 **Impact**: a customer edits the hidden field to the price of a cheaper plan, or of an old or test price still active in the account, pays that, and gets Pro features. Basic subscribers get Pro without any editing.
 **Fix**: the form sends a plan name, `basic` or `pro`, validated on the server; the price comes from configuration. Pro features check `subscribedToPrice()` with the Pro price (`User::hasPro()`, `EnsureProPlan` middleware).
-**Verified**: a price sent by the browser never reaches Stripe and the request gets a validation error (test 2); a Basic subscriber is sent to the pricing page from Pro features (test 2b). Checkout of each plan still sends its configured price (normal use).
+**Verified**: a price sent by the browser never reaches Stripe, alone or next to a valid plan (test 2); a Basic subscriber is sent to the pricing page from Pro features (test 2b). Checkout of each plan still sends its configured price (normal use).
+
+**Also found in the review pass**: checkout never looked for an existing subscription, so a Pro customer who clicked Basic paid for both plans, and the app then read only the newest one. Checkout now refuses while a subscription that has not ended exists and points to the billing portal for plan changes (test 2c).
 
 ### 3. The CSV export is hidden, not protected (high)
 
