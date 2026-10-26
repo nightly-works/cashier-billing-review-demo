@@ -12,7 +12,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // The webhook route is defined in routes/web.php, with its signature check always on.
+        Cashier::ignoreRoutes();
     }
 
     /**

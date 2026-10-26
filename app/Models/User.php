@@ -13,7 +13,7 @@ use Illuminate\Notifications\Notifiable;
 use Laravel\Cashier\Billable;
 
 #[Fillable(['name', 'email', 'password'])]
-#[Hidden(['password', 'remember_token'])]
+#[Hidden(['password', 'remember_token', 'stripe_id', 'pm_type', 'pm_last_four', 'trial_ends_at'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
