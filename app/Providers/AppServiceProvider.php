@@ -21,8 +21,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        // Don't lock customers out while their payment is still being processed.
-        Cashier::keepIncompleteSubscriptionsActive();
-        Cashier::keepPastDueSubscriptionsActive();
+        // Cashier's defaults stay: a subscription whose first payment never succeeded
+        // (incomplete) or whose renewal failed (past_due) does not open paid features.
     }
 }
