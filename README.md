@@ -9,6 +9,8 @@ A proof piece for reviews of Laravel SaaS billing. A fictional bookkeeping app w
 | 3 | The export link is hidden for free users; the route is not protected | high | Pro middleware on the route |
 | 4 | `keepIncompleteSubscriptionsActive()` and `keepPastDueSubscriptionsActive()`: failed payments keep Pro | medium | Cashier's defaults back |
 
+A second checkout that billed both plans turned up during the review pass; it is fixed and tested too.
+
 Full write-up, in the format a client would receive: [docs/security-review.md](docs/security-review.md).
 
 ## History
