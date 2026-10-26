@@ -18,7 +18,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/billing/checkout', [BillingController::class, 'checkout']);
 
     Route::get('/reports', [ReportController::class, 'index']);
-    Route::get('/reports/export', [ReportController::class, 'export']);
+    Route::get('/reports/export', [ReportController::class, 'export'])->middleware('pro');
     Route::get('/reports/forecast', [ReportController::class, 'forecast'])->middleware('pro');
 });
 
