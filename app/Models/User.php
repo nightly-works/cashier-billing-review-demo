@@ -19,6 +19,13 @@ class User extends Authenticatable
     /** @use HasFactory<UserFactory> */
     use Billable, HasFactory, Notifiable;
 
+    public function hasPro(): bool
+    {
+        $pro = config('billing.prices.pro');
+
+        return filled($pro) && $this->subscribedToPrice($pro, 'default');
+    }
+
     public function transactions(): HasMany
     {
         return $this->hasMany(Transaction::class);

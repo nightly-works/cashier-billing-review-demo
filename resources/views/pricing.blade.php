@@ -4,12 +4,12 @@
 <h1>Ledgerly</h1>
 <form method="POST" action="/billing/checkout">
     @csrf
-    <input type="hidden" name="price" value="{{ $prices['basic'] }}">
+    <input type="hidden" name="plan" value="basic">
     <button>Basic · 9 € / month</button>
 </form>
 <form method="POST" action="/billing/checkout">
     @csrf
-    <input type="hidden" name="price" value="{{ $prices['pro'] }}">
+    <input type="hidden" name="plan" value="pro">
     <button>Pro · 29 € / month · CSV export and forecast</button>
 </form>
 </body></html>

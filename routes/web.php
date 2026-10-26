@@ -19,7 +19,7 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/reports', [ReportController::class, 'index']);
     Route::get('/reports/export', [ReportController::class, 'export']);
-    Route::get('/reports/forecast', [ReportController::class, 'forecast'])->middleware('subscribed');
+    Route::get('/reports/forecast', [ReportController::class, 'forecast'])->middleware('pro');
 });
 
 // Cashier's routes, registered here so the webhook uses StripeWebhookController.

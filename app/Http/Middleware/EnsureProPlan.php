@@ -6,11 +6,15 @@ use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
-class EnsureUserIsSubscribed
+/**
+ * Pro features need a valid subscription to the Pro price itself: any subscription is
+ * not enough, since Basic and any other price in the Stripe account are subscriptions too.
+ */
+class EnsureProPlan
 {
     public function handle(Request $request, Closure $next): Response
     {
-        if (! $request->user()?->subscribed('default')) {
+        if (! $request->user()?->hasPro()) {
             return redirect('/pricing');
         }
 

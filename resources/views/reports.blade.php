@@ -2,7 +2,7 @@
 <html lang="en"><head><meta charset="utf-8"><title>Reports</title></head>
 <body>
 <h1>Reports</h1>
-@if ($user->subscribed('default'))
+@if ($user->hasPro())
     <a href="/reports/export">Export CSV</a>
     <a href="/reports/forecast">Forecast</a>
 @else
